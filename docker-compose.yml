@@ -1,7 +1,7 @@
-
 version: "3.9"
 
 services:
+  # --- Telemedicine Backend ---
   backend:
     build: ./backend
     ports:
@@ -9,7 +9,13 @@ services:
     volumes:
       - ./backend:/app
     restart: always
+    environment:
+      - SECRET_KEY=your-secret-key
+      - DATABASE_URL=sqlite:///./telemedicine.db
+    networks:
+      - telemednet
 
+  # --- Telemedicine Frontend ---
   frontend:
     build: ./frontend
     ports:
@@ -19,3 +25,70 @@ services:
     depends_on:
       - backend
     restart: always
+    networks:
+      - telemednet
+
+  # --- Prometheus ---
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - telemednet
+
+  # --- Node Exporter ---
+  node-exporter:
+    image: prom/node-exporter
+    container_name: node-exporter
+    ports:
+      - "9100:9100"
+    networks:
+      - telemednet
+
+  # --- cAdvisor ---
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    networks:
+      - telemednet
+
+  # --- Alertmanager (Optional) ---
+  alertmanager:
+    image: prom/alertmanager
+    container_name: alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+    networks:
+      - telemednet
+
+  # --- Grafana ---
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-storage:/var/lib/grafana
+    networks:
+      - telemednet
+
+volumes:
+  grafana-storage:
+
+networks:
+  telemednet:
